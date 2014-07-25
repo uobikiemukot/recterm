@@ -2,7 +2,21 @@
 
 ## description
 
-Read terminal escape sequences and output gif animation directly (almost vt102 compatible terminal emulation).
+```
+                              +-------+
+      input: key sequence --> |recterm| --> output: animation gif
+                              +-------+
+                                |  ^
+                  key sequence  v  | terminal escape sequence
+                          +---------------+
+                          |pseudo terminal|
+                          +---------------+
+                                |  ^
+                                v  |
+                               +-----+
+                               |shell|
+                               +-----+
+```
 
 This program is based on [yaft](https://github.com/uobikiemukot/yaft).
 
