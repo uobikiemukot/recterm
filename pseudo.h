@@ -14,7 +14,6 @@
 	You should have received a copy of the GNU General Public License
 	along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
-
 /* non real framebuffer: just emulates screen */
 struct pseudobuffer {
 	uint8_t *buf;        /* copy of framebuffer */
@@ -22,6 +21,20 @@ struct pseudobuffer {
 	int line_length;     /* line length (byte) */
 	int bytes_per_pixel; /* BYTES per pixel */
 };
+
+void pb_init(struct pseudobuffer *pb, int width, int height)
+{
+	pb->width  = width;
+	pb->height = height;
+	pb->bytes_per_pixel = BYTES_PER_PIXEL;
+	pb->line_length = pb->width * pb->bytes_per_pixel;
+	pb->buf = ecalloc(pb->width * pb->height, pb->bytes_per_pixel);
+}
+
+void pb_die(struct pseudobuffer *pb)
+{
+	free(pb->buf);
+}
 
 static inline void draw_sixel(struct pseudobuffer *pb, int line, int col, uint8_t *bitmap)
 {
