@@ -48,7 +48,7 @@ struct gif_t {
 	int colormap[COLORS * BYTES_PER_PIXEL + 1];
 };
 
-static const char *default_output = "irec.gif";
+static const char *default_output = "recterm.gif";
 
 void sig_handler(int signo)
 {
