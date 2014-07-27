@@ -190,6 +190,7 @@ struct tty_state { /* this variables changed at catching signals */
 	volatile sig_atomic_t redraw_flag;    /* SIGUSR1: vt activated */
 	volatile sig_atomic_t loop_flag;      /* SIGCHLD: child process (shell) is alive or not */
 	volatile sig_atomic_t window_resized; /* SIGWINCH: only used for yaftx */
+	volatile sig_atomic_t child_killed;
 };
 
 /* global variables */
@@ -198,4 +199,5 @@ struct tty_state tty = {
 	.redraw_flag    = false,
 	.loop_flag      = true,
 	.window_resized = false,
+	.child_killed   = false,
 };
