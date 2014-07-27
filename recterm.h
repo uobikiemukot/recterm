@@ -33,6 +33,9 @@
 #include <unistd.h>
 #include <wchar.h>
 
+#include <sys/wait.h>
+#include <time.h>
+
 #include "glyph/milkjf.h"
 #include "color.h"
 

@@ -26,13 +26,11 @@
 #include "gifsave89.h"
 
 enum {
-	TERM_WIDTH      = 640,
-	TERM_HEIGHT     = 384,
-	INPUT_WAIT      = 0,
-	INPUT_BUF       = 1,
-	GIF_DELAY       = 10,
-	OUTPUT_BUF      = 1024,
-	NO_OUTPUT_LIMIT = 16,
+	TERM_WIDTH  = 640,
+	TERM_HEIGHT = 384,
+	TERM_COLS   = 80,
+	TERM_ROWS   = 24,
+	INPUT_SIZE  = 1,
 };
 
 enum cmap_bitfield {
@@ -43,6 +41,75 @@ enum cmap_bitfield {
 	GREEN_MASK  = 3,
 	BLUE_MASK   = 2
 };
+
+struct gif_t {
+	void *data;
+	unsigned char *image;
+	int colormap[COLORS * BYTES_PER_PIXEL + 1];
+};
+
+static const char *default_output = "irec.gif";
+
+void sig_handler(int signo)
+{
+	if (DEBUG)
+		fprintf(stderr, "caught signal(num:%d)\n", signo);
+
+	if (signo == SIGCHLD) {
+		wait(NULL);
+		tty.loop_flag = false;
+	}
+}
+
+void set_rawmode(int fd, struct termios *old_termio)
+{
+	struct termios termio;
+
+	termio = *old_termio;
+	termio.c_iflag = termio.c_oflag = 0;
+	termio.c_cflag &= ~CSIZE;
+	termio.c_cflag |= CS8;
+	termio.c_lflag &= ~(ECHO | ISIG | ICANON);
+	termio.c_cc[VMIN]  = 1; /* min data size (byte) */
+	termio.c_cc[VTIME] = 0; /* time out */
+	etcsetattr(fd, TCSAFLUSH, &termio);
+}
+
+void tty_init(struct termios *old_termio, struct winsize *old_ws)
+{
+	struct sigaction sigact;
+
+	memset(&sigact, 0, sizeof(struct sigaction));
+	sigact.sa_handler = sig_handler;
+	sigact.sa_flags   = SA_RESTART;
+	esigaction(SIGCHLD, &sigact, NULL);
+
+	/* save current termio mode and disable linebuffering/echo */
+	etcgetattr(STDIN_FILENO, old_termio);
+	set_rawmode(STDIN_FILENO, old_termio);
+
+	/* save current terminal size */
+	ioctl(STDIN_FILENO, TIOCGWINSZ, old_ws);
+
+	//ewrite(STDIN_FILENO, "\033[?25l", 6); /* make cusor invisible */
+}
+
+void tty_die(struct termios *old_termio, struct winsize *old_ws)
+{
+	struct sigaction sigact;
+
+	memset(&sigact, 0, sizeof(struct sigaction));
+	sigact.sa_handler = SIG_DFL;
+	sigaction(SIGCHLD, &sigact, NULL);
+
+	/* restore termio mode */
+	tcsetattr(STDIN_FILENO, TCSAFLUSH, old_termio);
+
+	/* restore terminal size */
+	ioctl(STDIN_FILENO, TIOCSWINSZ, old_ws);
+
+	//ewrite(STDIN_FILENO, "\033[?25h", 6); /* make cursor visible */
+}
 
 void fork_and_exec(int *master, int lines, int cols)
 {
@@ -58,27 +125,14 @@ void fork_and_exec(int *master, int lines, int cols)
 	}
 }
 
-void check_fds(fd_set *fds, struct timeval *tv, int fd)
+void check_fds(fd_set *fds, struct timeval *tv, int input, int master)
 {
 	FD_ZERO(fds);
-	FD_SET(fd, fds);
+	FD_SET(input, fds);
+	FD_SET(master, fds);
 	tv->tv_sec  = 0;
 	tv->tv_usec = SELECT_TIMEOUT;
-	eselect(fd + 1, fds, NULL, NULL, tv);
-}
-
-void pb_init(struct pseudobuffer *pb)
-{
-	pb->width  = TERM_WIDTH;
-	pb->height = TERM_HEIGHT;
-	pb->bytes_per_pixel = BYTES_PER_PIXEL;
-	pb->line_length = pb->width * pb->bytes_per_pixel;
-	pb->buf = ecalloc(pb->width * pb->height, pb->bytes_per_pixel);
-}
-
-void pb_die(struct pseudobuffer *pb)
-{
-	free(pb->buf);
+	eselect(master + 1, fds, NULL, NULL, tv);
 }
 
 void set_colormap(int colormap[COLORS * BYTES_PER_PIXEL + 1])
@@ -131,7 +185,7 @@ uint32_t pixel2index(uint32_t pixel)
 	if (r == g && r == b) { // 24 gray scale
 		r = 24 * r / COLORS;
 		return 232 + r;
-	}                       // 6x6x6 color cube
+	}					   // 6x6x6 color cube
 
 	r = 6 * r / COLORS;
 	g = 6 * g / COLORS;
@@ -150,128 +204,143 @@ uint32_t pixel2index(uint32_t pixel)
 	return (r << RED_SHIFT) | (g << GREEN_SHIFT) | (b << BLUE_SHIFT);
 }
 
-void apply_colormap(struct pseudobuffer *pb, unsigned char *img)
+void apply_colormap(struct pseudobuffer *pb, unsigned char *capture)
 {
 	int w, h;
 	uint32_t pixel = 0;
 
 	for (h = 0; h < pb->height; h++) {
-	    for (w = 0; w < pb->width; w++) {
-	        memcpy(&pixel, pb->buf + h * pb->line_length
-	            + w * pb->bytes_per_pixel, pb->bytes_per_pixel);
-	        *(img + h * pb->width + w) = pixel2index(pixel) & bit_mask[BITS_PER_BYTE];
-	    }
+		for (w = 0; w < pb->width; w++) {
+			memcpy(&pixel, pb->buf + h * pb->line_length
+				+ w * pb->bytes_per_pixel, pb->bytes_per_pixel);
+			*(capture + h * pb->width + w) = pixel2index(pixel) & bit_mask[BITS_PER_BYTE];
+		}
 	}
 }
 
-size_t write_gif(unsigned char *gifimage, int size)
+void gif_init(struct gif_t *gif, int width, int height)
 {
-	size_t wsize = 0;
+	set_colormap(gif->colormap);
 
-	wsize = fwrite(gifimage, sizeof(unsigned char), size, stdout);
-	return wsize;
+	if (!(gif->data = newgif((void **) &gif->image, width, height, gif->colormap, 0)))
+		exit(EXIT_FAILURE);
+
+	animategif(gif->data, /* repetitions */ 1, /* delay */ 0,
+		/* transparent background */  -1, /* disposal */ 2);
 }
-void sig_handler(int signo)
+
+void gif_die(struct gif_t *gif, FILE *output)
 {
-	if (signo == SIGINT) {
-	    if (DEBUG)
-	        fprintf(stderr, "caught signal(no: %d)! exiting...\n", signo);
-	    tty.loop_flag = false;
+	int size;
+
+	size = endgif(gif->data);
+	if (size > 0) {
+		//ewrite(STDOUT_FILENO, gif->image, size);
+		fwrite(gif->image, sizeof(unsigned char), size, output);
+		free(gif->image);
 	}
 }
 
-void sig_set()
+int get_timegap(time_t *prev)
+//int get_timegap(clock_t *prev)
 {
-	struct sigaction sigact;
+	time_t now = time(NULL);
+	//clock_t now = clock();
+	int gap; /* 1 unit = 1/100 sec */
 
-	memset(&sigact, 0, sizeof(struct sigaction));
-	sigact.sa_handler = sig_handler;
-	sigact.sa_flags   = SA_RESTART;
-	sigaction(SIGINT, &sigact, NULL);
-}
+	gap = (now - *prev);
+	gap = (gap <= 0) ? 10: 100 * gap;
+	//gap = (double) 100.0 * (now - *prev) / CLOCKS_PER_SEC;
 
-void sig_reset()
-{
-	struct sigaction sigact;
+	if (DEBUG)
+		fprintf(stderr, "prev:%ld now:%ld gap:%u\n", *prev, now, gap);
 
-	memset(&sigact, 0, sizeof(struct sigaction));
-	sigact.sa_handler = SIG_DFL;
-	sigaction(SIGINT, &sigact, NULL);
+	*prev = now;
+	return gap;
 }
 
 int main(int argc, char *argv[])
 {
-	uint8_t ibuf[INPUT_BUF], obuf[OUTPUT_BUF];
-	int fd, no_output_count = 0;
-	ssize_t rsize, osize;
+	uint8_t buf[BUFSIZE];
+	//char escseq[BUFSIZE];
+	ssize_t size;
+	int master, gap;
 	fd_set fds;
+	FILE *output;
 	struct timeval tv;
-	struct terminal term;
+	struct winsize old_ws;
+	struct termios old_termio;
 	struct pseudobuffer pb;
+	struct terminal term;
+	struct gif_t gif;
+	unsigned char *capture;
+	time_t prev;
+	//clock_t prev;
 
-	void *gsdata;
-	unsigned char *gifimage = NULL;
-	int gifsize, colormap[COLORS * BYTES_PER_PIXEL + 1];
-	unsigned char *img;
-
-	fd = (argc < 2) ? STDIN_FILENO: eopen(argv[1], O_RDONLY);
+	/* check args */
+	output = (argc < 2) ? fopen(default_output, "w"): fopen(argv[1], "w");
 
 	/* init */
 	setlocale(LC_ALL, "");
-	pb_init(&pb);
+	pb_init(&pb, TERM_WIDTH, TERM_HEIGHT);
 	term_init(&term, pb.width, pb.height);
-	sig_set();
+	tty_init(&old_termio, &old_ws);
 
 	/* fork and exec shell */
-	fork_and_exec(&term.fd, term.lines, term.cols);
+	//ioctl(STDIN_FILENO, TIOCGWINSZ, &ws);
+	//fork_and_exec(&master, ws.ws_row, ws.ws_col);
 
-	/* init gif */
-	img = (unsigned char *) ecalloc(pb.width * pb.height, 1);
-	set_colormap(colormap);
-	if (!(gsdata = newgif((void **) &gifimage, pb.width, pb.height, colormap, 0)))
-		return EXIT_FAILURE;
+	/* set termio size 80x24 */
+	fork_and_exec(&master, TERM_ROWS, TERM_COLS);
 
-	animategif(gsdata, /* repetitions */ 0, GIF_DELAY,
-		/* transparent background */  -1, /* disposal */ 2);
+	/* set terminal size 80x24 (dtterm sequence) */
+	//snprintf(escseq, BUFSIZE, "\033[8;%d;%dt", TERM_ROWS, TERM_COLS);
+	//ewrite(STDOUT_FILENO, escseq, strlen(escseq));
+
+	/* reset terminal */
+	ewrite(STDOUT_FILENO, "\033c", 2);
+
+	gif_init(&gif, pb.width, pb.height);
+	capture = (unsigned char *) ecalloc(pb.width * pb.height, 1);
+	prev = time(NULL);
+	//prev = clock();
 
 	/* main loop */
-	while (no_output_count < NO_OUTPUT_LIMIT) {
-		usleep(INPUT_WAIT);
-		rsize = read(fd, ibuf, INPUT_BUF);
-		//fprintf(stderr, "rsize:%d\n", rsize);
-		if (rsize > 0)
-			ewrite(term.fd, ibuf, rsize);
-
-		check_fds(&fds, &tv, term.fd);
-		if (FD_ISSET(term.fd, &fds)) {
-			//fprintf(stderr, "osize:%d\n", osize);
-			osize = read(term.fd, obuf, OUTPUT_BUF);
-			if (osize > 0) {
-				parse(&term, obuf, osize);
+	while (tty.loop_flag) {
+		check_fds(&fds, &tv, STDIN_FILENO, master);
+		if (FD_ISSET(STDIN_FILENO, &fds)) {
+			if ((size = read(STDIN_FILENO, buf, INPUT_SIZE)) > 0)
+				ewrite(master, buf, size);
+		}
+		if (FD_ISSET(master, &fds)) {
+			if ((size = read(master, buf, BUFSIZE)) > 0) {
+				parse(&term, buf, size);
 				refresh(&pb, &term);
-
-				/* take screenshot */
-				apply_colormap(&pb, img);
-				putgif(gsdata, img);
+				ewrite(STDOUT_FILENO, buf, size);
+				if (size != BUFSIZE) /* maybe more data arrives soon */
+					tty.redraw_flag = true;
 			}
-			no_output_count = 0;
-		} else {
-			no_output_count++;
+		}
+		/* output shell output to file (add gap info) */
+		if (tty.redraw_flag) {
+			gap = get_timegap(&prev);
+			apply_colormap(&pb, capture);
+			controlgif(gif.data, /* transparency color index */ -1,
+				/* delay */ gap, /* userinput */ 0, /* disposal */ 2);
+			putgif(gif.data, capture);
+			tty.redraw_flag = false;
 		}
 	}
 
-	/* output gif */
-	gifsize = endgif(gsdata);
-	if (gifsize > 0) {
-		write_gif(gifimage, gifsize);
-		free(gifimage);
-	}
-	free(img);
-
 	/* normal exit */
-	sig_reset();
+	gif_die(&gif, output);
+	free(capture);
+
+	tty_die(&old_termio, &old_ws);
 	term_die(&term);
-	eclose(fd);
+	pb_die(&pb);
+
+	efclose(output);
 
 	return EXIT_SUCCESS;
 }
