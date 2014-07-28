@@ -483,7 +483,7 @@ void decdld_parse_data(char *start_buf, int start_char, struct glyph_t *chars)
 		if ('?' <= *cp && *cp <= '~') { /* sixel bitmap */
 			if (DEBUG)
 				fprintf(stderr, "char_num(ten):0x%.2X\n", char_num);
-	        /* remove offset '?' and use only 6bit */
+			/* remove offset '?' and use only 6bit */
 			bitmap = bit_mask[BITS_PER_SIXEL] & (*cp - '?');
 			decdld_bitmap(&chars[char_num], bitmap, row, column);
 			column++;
