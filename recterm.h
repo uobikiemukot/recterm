@@ -20,7 +20,7 @@
 #include <unistd.h>
 #include <wchar.h>
 
-#include "glyph.h"
+#include "glyph/milkjf.h"
 #include "color.h"
 
 #define SIGWINCH 28
