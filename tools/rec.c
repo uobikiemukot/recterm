@@ -96,29 +96,30 @@ void check_fds(fd_set *fds, struct timeval *tv, int input, int master)
 	eselect(master + 1, fds, NULL, NULL, tv);
 }
 
-void write_timegap(int output, time_t *prev)
+void write_timegap(int output, struct timeval *prev)
 {
 	char escseq[BUFSIZE];
-	time_t now = time(NULL);
-	unsigned int gap; /* 1 unit = 100ms */
+	struct timeval now;
+	double gap; /* 1 unit = 100ms */
 
-	//gap = (double) 10.0 * (now - *prev) / CLOCKS_PER_SEC;
-	gap = 10 * (now - *prev);
+	gettimeofday(&now, NULL);
+	/* sec */
+	gap = (now.tv_sec - prev->tv_sec) + (double) (now.tv_usec - prev->tv_usec) / 1000000;
+	/* gif delay 100 = 1 sec */
+	gap = 100.0 * gap;
 
 	if (DEBUG)
-		fprintf(stderr, "prev:%ld now:%ld gap:%u\n", *prev, now, gap);
+		fprintf(stderr, "gap:%lf\n", gap);
 
 	/* define new escape sequence: (TIMEGAP)
-		CSI < Ps s
-			< : private parameter
-			Ps: time gap (1 == 100ms: the same value of gif delay)
+		CSI > Ps ~
+			> : private parameter
+			Ps: time gap (100 == 1sec: the same value of gif delay)
 			~ : final character
 	*/
-	if (gap > 0) {
-		snprintf(escseq, BUFSIZE, "\033[<%u~", gap);
-		ewrite(output, escseq, strlen(escseq));
-		*prev = now;
-	}
+	snprintf(escseq, BUFSIZE, "\033[<%d~", (int) gap);
+	ewrite(output, escseq, strlen(escseq));
+	*prev = now;
 }
 
 int main(int argc, char *argv[])
@@ -127,12 +128,11 @@ int main(int argc, char *argv[])
 	int output;
 	char escseq[BUFSIZE];
 	ssize_t size;
-	int master;
+	int master = -1;
 	fd_set fds;
-	struct timeval tv;
+	struct timeval tv, prev;
 	struct winsize ws;
 	struct termios old_termio;
-	time_t prev;
 
 	/* check args */
 	if (argc < 2) 
@@ -155,7 +155,7 @@ int main(int argc, char *argv[])
 	ewrite(master, escseq, strlen(escseq));
 	ewrite(output, escseq, strlen(escseq));
 
-	prev = time(NULL);
+	gettimeofday(&prev, NULL);
 
 	/* main loop */
 	while (tty.loop_flag) {
