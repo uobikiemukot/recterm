@@ -23,8 +23,5 @@ rec2gif: tools/rec2gif.c $(HDR)
 rec: tools/rec.c $(HDR)
 	$(CC) $(CFLAGS) $(LDFLAGS) $< -o $@
 
-recterm: $(SRC) $(HDR)
-	$(CC) $(CFLAGS) $(LDFLAGS) $< -o $@
-
 clean:
 	rm -f $(DST)
