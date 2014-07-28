@@ -9,6 +9,7 @@
 #include "dcs.h"
 #include "parse.h"
 #include "gifsave89.h"
+#include "gif.h"
 
 enum {
 	TERM_WIDTH  = 640,
@@ -16,21 +17,6 @@ enum {
 	TERM_COLS   = 80,
 	TERM_ROWS   = 24,
 	INPUT_SIZE  = 1,
-};
-
-enum cmap_bitfield {
-	RED_SHIFT   = 5,
-	GREEN_SHIFT = 2,
-	BLUE_SHIFT  = 0,
-	RED_MASK	= 3,
-	GREEN_MASK  = 3,
-	BLUE_MASK   = 2
-};
-
-struct gif_t {
-	void *data;
-	unsigned char *image;
-	int colormap[COLORS * BYTES_PER_PIXEL + 1];
 };
 
 static const char *default_output = "recterm.gif";
@@ -120,150 +106,43 @@ void check_fds(fd_set *fds, struct timeval *tv, int input, int master)
 	eselect(master + 1, fds, NULL, NULL, tv);
 }
 
-void set_colormap(int colormap[COLORS * BYTES_PER_PIXEL + 1])
+int get_timegap(struct timeval *prev)
 {
-	int i, ci, r, g, b;
-	uint8_t index;
+	struct timeval now;
+	double gap; /* 1 unit = 1/100 sec */
 
-	/* colormap: terminal 256color
-	for (i = 0; i < COLORS; i++) {
-		ci = i * BYTES_PER_PIXEL;
-
-		r = (color_list[i] >> 16) & bit_mask[8];
-		g = (color_list[i] >> 8)  & bit_mask[8];
-		b = (color_list[i] >> 0)  & bit_mask[8];
-
-		colormap[ci + 0] = r;
-		colormap[ci + 1] = g;
-		colormap[ci + 2] = b;
-	}
-	*/
-
-	/* colormap: red/green: 3bit blue: 2bit
-	*/
-	for (i = 0; i < COLORS; i++) {
-		index = (uint8_t) i;
-		ci = i * BYTES_PER_PIXEL;
-
-		r = (index >> RED_SHIFT)   & bit_mask[RED_MASK];
-		g = (index >> GREEN_SHIFT) & bit_mask[GREEN_MASK];
-		b = (index >> BLUE_SHIFT)  & bit_mask[BLUE_MASK];
-
-		colormap[ci + 0] = r * bit_mask[BITS_PER_BYTE] / bit_mask[RED_MASK];
-		colormap[ci + 1] = g * bit_mask[BITS_PER_BYTE] / bit_mask[GREEN_MASK];
-		colormap[ci + 2] = b * bit_mask[BITS_PER_BYTE] / bit_mask[BLUE_MASK];
-	}
-	colormap[COLORS * BYTES_PER_PIXEL] = -1;
-}
-
-uint32_t pixel2index(uint32_t pixel)
-{
-	/* pixel is always 24bpp */
-	uint32_t r, g, b;
-
-	/* split r, g, b bits */
-	r = (pixel >> 16) & bit_mask[8];
-	g = (pixel >> 8)  & bit_mask[8];
-	b = (pixel >> 0)  & bit_mask[8];
-
-	/* colormap: terminal 256color
-	if (r == g && r == b) { // 24 gray scale
-		r = 24 * r / COLORS;
-		return 232 + r;
-	}					   // 6x6x6 color cube
-
-	r = 6 * r / COLORS;
-	g = 6 * g / COLORS;
-	b = 6 * b / COLORS;
-
-	return 16 + (r * 36) + (g * 6) + b;
-	*/
-
-	/* colormap: red/green: 3bit blue: 2bit
-	*/
-	// get MSB ..._MASK bits
-	r = (r >> (8 - RED_MASK))   & bit_mask[RED_MASK];
-	g = (g >> (8 - GREEN_MASK)) & bit_mask[GREEN_MASK];
-	b = (b >> (8 - BLUE_MASK))  & bit_mask[BLUE_MASK];
-
-	return (r << RED_SHIFT) | (g << GREEN_SHIFT) | (b << BLUE_SHIFT);
-}
-
-void apply_colormap(struct pseudobuffer *pb, unsigned char *capture)
-{
-	int w, h;
-	uint32_t pixel = 0;
-
-	for (h = 0; h < pb->height; h++) {
-		for (w = 0; w < pb->width; w++) {
-			memcpy(&pixel, pb->buf + h * pb->line_length
-				+ w * pb->bytes_per_pixel, pb->bytes_per_pixel);
-			*(capture + h * pb->width + w) = pixel2index(pixel) & bit_mask[BITS_PER_BYTE];
-		}
-	}
-}
-
-void gif_init(struct gif_t *gif, int width, int height)
-{
-	set_colormap(gif->colormap);
-
-	if (!(gif->data = newgif((void **) &gif->image, width, height, gif->colormap, 0)))
-		exit(EXIT_FAILURE);
-
-	animategif(gif->data, /* repetitions */ 1, /* delay */ 0,
-		/* transparent background */  -1, /* disposal */ 2);
-}
-
-void gif_die(struct gif_t *gif, FILE *output)
-{
-	int size;
-
-	size = endgif(gif->data);
-	if (size > 0) {
-		//ewrite(STDOUT_FILENO, gif->image, size);
-		fwrite(gif->image, sizeof(unsigned char), size, output);
-		free(gif->image);
-	}
-}
-
-int get_timegap(time_t *prev)
-//int get_timegap(clock_t *prev)
-{
-	time_t now = time(NULL);
-	//clock_t now = clock();
-	int gap; /* 1 unit = 1/100 sec */
-
-	gap = (now - *prev);
-	gap = (gap <= 0) ? 10: 100 * gap;
-	//gap = (double) 100.0 * (now - *prev) / CLOCKS_PER_SEC;
+	gettimeofday(&now, NULL);
+	/* sec */
+	gap = (now.tv_sec - prev->tv_sec) + (double) (now.tv_usec - prev->tv_usec) / 1000000;
+	/* gif delay 100 = 1 sec */
+	gap = 100.0 * gap;
 
 	if (DEBUG)
-		fprintf(stderr, "prev:%ld now:%ld gap:%u\n", *prev, now, gap);
+		fprintf(stderr, "gap:%lf\n", gap);
 
 	*prev = now;
-	return gap;
+	return (int) gap;
 }
 
 int main(int argc, char *argv[])
 {
 	uint8_t buf[BUFSIZE];
-	//char escseq[BUFSIZE];
+	char escseq[BUFSIZE];
 	ssize_t size;
-	int master, gap;
+	int master = -1, gap;
 	fd_set fds;
 	FILE *output;
-	struct timeval tv;
+	struct timeval tv, prev;
 	struct winsize old_ws;
 	struct termios old_termio;
 	struct pseudobuffer pb;
 	struct terminal term;
 	struct gif_t gif;
 	unsigned char *capture;
-	time_t prev;
-	//clock_t prev;
+	bool screen_refreshed = false, is_first_frame = true;
 
 	/* check args */
-	output = (argc < 2) ? fopen(default_output, "w"): fopen(argv[1], "w");
+	output = (argc < 2) ? efopen(default_output, "w"): efopen(argv[1], "w");
 
 	/* init */
 	setlocale(LC_ALL, "");
@@ -272,6 +151,7 @@ int main(int argc, char *argv[])
 	tty_init(&old_termio, &old_ws);
 
 	/* fork and exec shell */
+	/* use current termio size */
 	//ioctl(STDIN_FILENO, TIOCGWINSZ, &ws);
 	//fork_and_exec(&master, ws.ws_row, ws.ws_col);
 
@@ -279,16 +159,14 @@ int main(int argc, char *argv[])
 	fork_and_exec(&master, TERM_ROWS, TERM_COLS);
 
 	/* set terminal size 80x24 (dtterm sequence) */
-	//snprintf(escseq, BUFSIZE, "\033[8;%d;%dt", TERM_ROWS, TERM_COLS);
-	//ewrite(STDOUT_FILENO, escseq, strlen(escseq));
+	snprintf(escseq, BUFSIZE, "\033[8;%d;%dt", TERM_ROWS, TERM_COLS);
+	ewrite(STDOUT_FILENO, escseq, strlen(escseq));
 
 	/* reset terminal */
 	ewrite(STDOUT_FILENO, "\033c", 2);
 
 	gif_init(&gif, pb.width, pb.height);
 	capture = (unsigned char *) ecalloc(pb.width * pb.height, 1);
-	prev = time(NULL);
-	//prev = clock();
 
 	/* main loop */
 	while (tty.loop_flag) {
@@ -301,19 +179,29 @@ int main(int argc, char *argv[])
 			if ((size = read(master, buf, BUFSIZE)) > 0) {
 				parse(&term, buf, size);
 				refresh(&pb, &term);
+
+				/* pass through */
 				ewrite(STDOUT_FILENO, buf, size);
-				if (size != BUFSIZE) /* maybe more data arrives soon */
-					tty.redraw_flag = true;
+
+				if (size == BUFSIZE)
+					;/* maybe more data arrives soon */
+				else
+					screen_refreshed = true;
 			}
 		}
-		/* output shell output to file (add gap info) */
-		if (tty.redraw_flag) {
+		/* add new frame to gif */
+		if (screen_refreshed) {
 			gap = get_timegap(&prev);
+			if (is_first_frame) {
+				is_first_frame = false; /* not capture */
+			}
+			else {
+				controlgif(gif.data, /* transparency color index */ -1,
+					/* delay */ gap, /* userinput */ 0, /* disposal */ 2);
+				putgif(gif.data, capture);
+			}
 			apply_colormap(&pb, capture);
-			controlgif(gif.data, /* transparency color index */ -1,
-				/* delay */ gap, /* userinput */ 0, /* disposal */ 2);
-			putgif(gif.data, capture);
-			tty.redraw_flag = false;
+			screen_refreshed = false;
 		}
 	}
 
