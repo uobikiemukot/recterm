@@ -17,6 +17,7 @@ enum {
 	TERM_COLS   = 80,
 	TERM_ROWS   = 24,
 	INPUT_SIZE  = 1,
+	MINIMUM_DELAY = 10,
 };
 
 static const char *default_output = "recterm.gif";
@@ -117,6 +118,9 @@ int get_timegap(struct timeval *prev)
 	/* gif delay 100 = 1 sec */
 	gap = 100.0 * gap;
 
+	if (gap < MINIMUM_DELAY)
+		gap = MINIMUM_DELAY;
+
 	if (DEBUG)
 		fprintf(stderr, "gap:%lf\n", gap);
 
@@ -167,6 +171,7 @@ int main(int argc, char *argv[])
 
 	gif_init(&gif, pb.width, pb.height);
 	capture = (unsigned char *) ecalloc(pb.width * pb.height, 1);
+	get_timegap(&prev);
 
 	/* main loop */
 	while (tty.loop_flag) {
