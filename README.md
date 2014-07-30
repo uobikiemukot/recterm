@@ -42,7 +42,7 @@ $ recterm output.gif
 ## tools
 
 rec
-:	the alternative of ttyrec (using valid terminal escape sequence)
+:	the alternative of ttyrec (using valid terminal escape sequence only)
 
 rec2gif
 :	convert record of rec into gif
@@ -52,7 +52,7 @@ recfilter
 
 ## related program
 
--	[seq2gif](https://github.com/saitoha/seq2gif) by saitoha
+-	[seq2gif](https://github.com/saitoha/seq2gif) (by saitoha)
 	convert a ttyrec record into a gif animation directly (fork of recterm, using yaft's terminal emulation)
 
 ## license
