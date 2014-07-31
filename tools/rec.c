@@ -148,6 +148,7 @@ int main(int argc, char *argv[])
 	tty_init(&old_termio, &ws);
 
 	/* fork and exec shell */
+	/* use current termio size */
 	//ioctl(STDIN_FILENO, TIOCGWINSZ, &ws);
 	//fork_and_exec(&master, ws.ws_row, ws.ws_col);
 
@@ -156,7 +157,7 @@ int main(int argc, char *argv[])
 
 	/* set terminal size 80x24 (dtterm sequence) */
 	snprintf(escseq, BUFSIZE, "\033[8;%d;%dt", TERM_ROWS, TERM_COLS);
-	ewrite(master, escseq, strlen(escseq));
+	ewrite(STDOUT_FILENO, escseq, strlen(escseq));
 	ewrite(output, escseq, strlen(escseq));
 
 	gettimeofday(&prev, NULL);
