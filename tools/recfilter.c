@@ -58,6 +58,7 @@ void sig_reset()
 
 pid_t fork_and_exec(int *master, int lines, int cols)
 {
+	char *shell_env;
 	pid_t pid;
 	struct winsize ws = {.ws_row = lines, .ws_col = cols,
 		.ws_xpixel = 0, .ws_ypixel = 0};
@@ -66,7 +67,10 @@ pid_t fork_and_exec(int *master, int lines, int cols)
 
 	if (pid == 0) { /* child */
 		esetenv("TERM", term_name, 1);
-		eexecvp(shell_cmd, (const char *[]){shell_cmd, NULL});
+		if ((shell_env = getenv("SHELL")) != NULL)
+			eexecvp(shell_env, (const char *[]){shell_env, NULL});
+		else
+			eexecvp(shell_cmd, (const char *[]){shell_cmd, NULL});
 	}
 	return pid;
 }
