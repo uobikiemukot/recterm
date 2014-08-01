@@ -20,7 +20,6 @@
 #include <unistd.h>
 #include <wchar.h>
 
-//#include "glyph/milkjf.h"
 #include "glyph/multi.h"
 #include "color.h"
 
