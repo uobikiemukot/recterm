@@ -1,14 +1,16 @@
 /*
-	Converted from:
-		milkjf_8x16.bdf, milkjf_8x16r.bdf, milkjf_k16.bdf
-		(converter found in https://github.com/uobikiemukot/yaft/tree/master/tools)
 	-------------------------------------------------------------------------------
 	Original Licence:
 		Public Domain
+		Copyright (C) 日本農園
 	-------------------------------------------------------------------------------
 	History:
-		Original milkjf font was designed by japanfarm (日本農園) and used on Sharp X68000 series.
+		Original milkjf font was designed by japanfarm (Nihon Nouen) and used on Sharp X68000 series.
 		Chisato Yamauchi converted milkjf font to bdf for X Window System.
+	-------------------------------------------------------------------------------
+	Converted from:
+		milkjf_8x16.bdf, milkjf_8x16r.bdf, milkjf_k16.bdf
+		(converter found in https://github.com/uobikiemukot/yaft/tree/master/tools)
 	-------------------------------------------------------------------------------
 
 	Copyright (C) 2014 haru <uobikiemukot at gmail dot com>
