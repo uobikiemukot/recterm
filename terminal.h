@@ -195,13 +195,13 @@ void addch(struct terminal *term, uint32_t code)
 
 	width = wcwidth(code);
 
-	if (width <= 0) /* zero width */
+	if (width <= 0)                                /* zero width: not support comibining character */
 		return;
-	else if (0x100000 <= code && code <= 0x10FFFD) /* Unicode private area: plane 16 */
+	else if (0x100000 <= code && code <= 0x10FFFD) /* unicode private area: plane 16 (DRCSMMv1) */
 		glyphp = drcsch(term, code);
-	else if (code >= UCS2_CHARS /* yaft support only UCS2 */
-		|| term->glyph_map[code] == NULL /* missing glyph */
-		|| term->glyph_map[code]->width != width) /* width unmatch */
+	else if (code >= UCS2_CHARS                    /* yaft support only UCS2 */
+		|| term->glyph_map[code] == NULL           /* missing glyph */
+		|| term->glyph_map[code]->width != width)  /* width unmatch */
 		glyphp = (width == 1) ? term->glyph_map[SUBSTITUTE_HALF]: term->glyph_map[SUBSTITUTE_WIDE];
 	else
 		glyphp = term->glyph_map[code];
