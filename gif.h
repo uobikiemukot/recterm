@@ -111,15 +111,14 @@ void gif_init(struct gif_t *gif, int width, int height)
 	if (!(gif->data = newgif((void **) &gif->image, width, height, gif->colormap, 0)))
 		exit(EXIT_FAILURE);
 
-	animategif(gif->data, /* repetitions */ 1, /* delay */ 0,
-		/* transparent background */  -1, /* disposal */ 2);
+	animategif(gif->data, /* repetitions */ GIF_REPEAT, /* delay */ GIF_DELAY,
+		/* transparent background */ GIF_TRANSPARENT, /* disposal */ GIF_DISPOSAL);
 }
 
 void gif_die(struct gif_t *gif, FILE *output)
 {
-	int size;
+	int size = endgif(gif->data);
 
-	size = endgif(gif->data);
 	if (size > 0) {
 		//ewrite(STDOUT_FILENO, gif->image, size);
 		if (output)
