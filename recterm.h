@@ -20,7 +20,7 @@
 #include <unistd.h>
 #include <wchar.h>
 
-#include "glyph/multi.h"
+#include "glyph/multi_ambiguous_wide.h"
 #include "color.h"
 
 #define SIGWINCH 28
@@ -170,18 +170,18 @@ struct parm_t { /* for parse_arg() */
 };
 
 struct tty_state { /* this variables changed at catching signals */
-	volatile sig_atomic_t visible;        /* SIGUSR1: vt is active or not */
-	volatile sig_atomic_t redraw_flag;    /* SIGUSR1: vt activated */
+	//volatile sig_atomic_t visible;        /* SIGUSR1: vt is active or not */
+	//volatile sig_atomic_t redraw_flag;    /* SIGUSR1: vt activated */
 	volatile sig_atomic_t loop_flag;      /* SIGCHLD: child process (shell) is alive or not */
-	volatile sig_atomic_t window_resized; /* SIGWINCH: only used for yaftx */
+	//volatile sig_atomic_t window_resized; /* SIGWINCH: only used for yaftx */
 	volatile sig_atomic_t child_killed;
 };
 
 /* global variables */
 struct tty_state tty = {
-	.visible        = true,
-	.redraw_flag    = false,
+	//.visible        = true,
+	//.redraw_flag    = false,
 	.loop_flag      = true,
-	.window_resized = false,
+	//.window_resized = false,
 	.child_killed   = false,
 };
