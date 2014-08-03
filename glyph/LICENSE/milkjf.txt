@@ -1,0 +1,7 @@
+Original License:
+	Public Domain
+	Copyright (C) Nihon Nouen
+
+History:
+	Original milkjf font was designed by japanfarm (Nihon Nouen) and used on Sharp X68000 series.
+	Chisato Yamauchi converted milkjf font to bdf for X Window System.
