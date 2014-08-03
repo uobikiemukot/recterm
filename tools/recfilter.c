@@ -10,6 +10,7 @@
 #include "../parse.h"
 #include "../gifsave89.h"
 #include "../gif.h"
+#include "../mk_wcwidth.h"
 
 enum {
 	TERM_WIDTH      = 640,
@@ -103,7 +104,10 @@ int main(int argc, char *argv[])
 	/* init */
 	setlocale(LC_ALL, "");
 	pb_init(&pb, TERM_WIDTH, TERM_HEIGHT);
-	term_init(&term, pb.width, pb.height);
+	/* TODO: add ambiguous width option */
+	wcwidth = mk_wcwidth_cjk;
+	term_init(&term, pb.width, pb.height,
+		ambiguous_wide_glyphs, sizeof(ambiguous_wide_glyphs) / sizeof(struct glyph_t));
 	sig_set();
 
 	/* fork and exec shell */
