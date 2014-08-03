@@ -14,9 +14,9 @@ enum {
 	//LAZY_DRAW        = false,  /* don't draw when input data size is larger than BUFSIZE */
 	//BACKGROUND_DRAW  = true,   /* always draw even if vt is not active */
 	//WALLPAPER        = true,   /* copy framebuffer before startup, and use it as wallpaper */
-	SUBSTITUTE_HALF  = 0x0020, /* used for missing glyph (single width): U+0020 (SPACE) */
-	SUBSTITUTE_WIDE  = 0x3000, /* used for missing glyph (double width): U+3000 (IDEOGRAPHIC SPACE) */
-	REPLACEMENT_CHAR = 0x003F, /* used for malformed UTF-8 sequence    : U+003F (QUESTION MARK)  */
+	SUBSTITUTE_HALF  = 0xFFFD, /* used for missing glyph(single width): U+FFFD (REPLACEMENT CHARACTER)) */
+	SUBSTITUTE_WIDE  = 0x3013, /* used for missing glyph(double width): U+3013 (GETA MARK) */
+	REPLACEMENT_CHAR = 0xFFFD, /* used for malformed UTF-8 sequence   : U+FFFD (REPLACEMENT CHARACTER)  */
 };
 
 /* TERM value */
@@ -28,5 +28,5 @@ const char *term_name = "yaft-256color";
 #elif defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__)
 	const char *shell_cmd = "/bin/csh";
 #elif defined(__ANDROID__)
-	const char *shell_cmd = "/system/bin/sh"; /* for Android */
+	const char *shell_cmd = "/system/bin/sh"; /* for Android: not tested */
 #endif

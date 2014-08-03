@@ -196,25 +196,14 @@ int main(int argc, char *argv[])
 	if (cols == 0)
 		cols = TERM_COLS;
 
-	wcwidth = (ambiguous_is_wide) ? mk_wcwidth_cjk: mk_wcwidth;
+	my_wcwidth = (ambiguous_is_wide) ? mk_wcwidth_cjk: mk_wcwidth;
 
 	/* init */
-	//setlocale(LC_ALL, ""); /* for wcwidth() */
 	pb_init(&pb, CELL_WIDTH * cols, CELL_HEIGHT * rows);
-	if (ambiguous_is_wide)
-		term_init(&term, pb.width, pb.height,
-			ambiguous_wide_glyphs, sizeof(ambiguous_wide_glyphs) / sizeof(struct glyph_t));
-	else
-		term_init(&term, pb.width, pb.height,
-			ambiguous_half_glyphs, sizeof(ambiguous_half_glyphs) / sizeof(struct glyph_t));
+	term_init(&term, pb.width, pb.height, ambiguous_is_wide);
 	tty_init(&old_termio, &old_ws);
 
 	/* fork and exec shell */
-	/* use current termio size */
-	//ioctl(STDIN_FILENO, TIOCGWINSZ, &ws);
-	//fork_and_exec(&master, ws.ws_row, ws.ws_col);
-
-	/* set termio size */
 	fork_and_exec(&master, rows, cols);
 
 	/* set terminal size (dtterm sequence) */

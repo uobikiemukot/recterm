@@ -250,7 +250,7 @@ void glyph_width_report(struct terminal *term, void *arg)
 
 	left = right = -1;
 	for (i = from; i <= to; i++) {
-		wcw = wcwidth(i);
+		wcw = my_wcwidth(i);
 		if (wcw <= 0) /* zero width */
 			w = 0;
 		else if (term->glyph_map[i] == NULL) /* missing glyph */

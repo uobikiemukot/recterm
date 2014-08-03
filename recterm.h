@@ -20,9 +20,9 @@
 #include <unistd.h>
 //#include <wchar.h>
 
-#include "glyph.h"
-#include "glyph/multi_ambiguous_half.h"
-#include "glyph/multi_ambiguous_wide.h"
+#include "glyph/glyph.h"
+#include "glyph/ambiguous_half.h"
+#include "glyph/ambiguous_wide.h"
 #include "color.h"
 
 #define SIGWINCH 28
@@ -188,4 +188,4 @@ struct tty_state tty = {
 	.child_killed   = false,
 };
 
-int (*wcwidth)(uint32_t ucs);
+int (*my_wcwidth)(uint32_t ucs);

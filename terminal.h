@@ -193,7 +193,7 @@ void addch(struct terminal *term, uint32_t code)
 	if (DEBUG)
 		fprintf(stderr, "addch: U+%.4X\n", code);
 
-	width = wcwidth(code);
+	width = my_wcwidth(code);
 
 	if (width <= 0)                                /* zero width: not support comibining character */
 		return;
@@ -335,10 +335,11 @@ void redraw(struct terminal *term)
 		term->line_dirty[i] = true;
 }
 
-void term_init(struct terminal *term, int width, int height, const struct glyph_t glyphs[], uint32_t glyph_num)
+void term_init(struct terminal *term, int width, int height, bool ambiguous_is_wide)
 {
 	int i;
-	uint32_t code, gi;
+	uint32_t code, gi, ambiguous_glyph_num;
+	const struct glyph_t *ambiguous_glyphs;
 
 	term->width  = width;
 	term->height = height;
@@ -361,9 +362,20 @@ void term_init(struct terminal *term, int width, int height, const struct glyph_
 	for (code = 0; code < UCS2_CHARS; code++)
 		term->glyph_map[code] = NULL;
 
-	//for (gi = 0; gi < size; gi++)
-	for (gi = 0; gi < glyph_num; gi++)
+	for (gi = 0; gi < sizeof(glyphs) / sizeof(struct glyph_t); gi++)
 		term->glyph_map[glyphs[gi].code] = &glyphs[gi];
+
+	if (ambiguous_is_wide) {
+		ambiguous_glyphs = ambiguous_wide_glyphs;
+		ambiguous_glyph_num = sizeof(ambiguous_wide_glyphs) / sizeof(struct glyph_t);
+	}
+	else {
+		ambiguous_glyphs = ambiguous_half_glyphs;
+		ambiguous_glyph_num = sizeof(ambiguous_half_glyphs) / sizeof(struct glyph_t);
+	}
+
+	for (gi = 0; gi < ambiguous_glyph_num; gi++)
+		term->glyph_map[ambiguous_glyphs[gi].code] = &ambiguous_glyphs[gi];
 
 	if (term->glyph_map[DEFAULT_CHAR] == NULL
 		|| term->glyph_map[SUBSTITUTE_HALF] == NULL
