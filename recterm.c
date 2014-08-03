@@ -17,10 +17,21 @@ enum {
 	TERM_COLS   = 80,
 	TERM_ROWS   = 24,
 	INPUT_SIZE  = 1,
-	MINIMUM_DELAY = 10,
+	MIN_DELAY   = 5,
 };
 
 static const char *default_output = "recterm.gif";
+
+void usage()
+{
+	printf(
+		"usage: recterm [-m min_delay] [-r rows] [-c cols] [output]          \n"
+		"\tmin_delay: minimum delay (1/100 sec) of animation gif (default: 5)\n"
+		"\trows     : column size of internal termios (default: 80)          \n"
+		"\tcols     : row size of internal termios (default: 24)             \n"
+		"\toutput   : output filename (default: recterm.gif)                 \n"
+	);
+}
 
 void sig_handler(int signo)
 {
@@ -111,7 +122,7 @@ void check_fds(fd_set *fds, struct timeval *tv, int input, int master)
 	eselect(master + 1, fds, NULL, NULL, tv);
 }
 
-int get_timegap(struct timeval *prev)
+int get_timegap(struct timeval *prev, int min_delay)
 {
 	struct timeval now;
 	double gap; /* 1 unit = 1/100 sec */
@@ -122,8 +133,8 @@ int get_timegap(struct timeval *prev)
 	/* gif delay 100 = 1 sec */
 	gap = 100.0 * gap;
 
-	if (gap < MINIMUM_DELAY)
-		gap = MINIMUM_DELAY;
+	if (gap < min_delay)
+		gap = min_delay;
 
 	if (DEBUG)
 		fprintf(stderr, "gap:%lf\n", gap);
@@ -134,10 +145,12 @@ int get_timegap(struct timeval *prev)
 
 int main(int argc, char *argv[])
 {
-	uint8_t buf[BUFSIZE];
+	uint8_t buf[BUFSIZE], *capture;
+	uint16_t rows = TERM_ROWS, cols = TERM_COLS;
 	char escseq[BUFSIZE];
+	bool screen_refreshed = false, is_first_frame = true;
 	ssize_t size;
-	int master = -1, gap;
+	int master = -1, delay = MIN_DELAY, gap, opt;
 	fd_set fds;
 	FILE *output;
 	struct timeval tv, prev;
@@ -146,15 +159,39 @@ int main(int argc, char *argv[])
 	struct pseudobuffer pb;
 	struct terminal term;
 	struct gif_t gif;
-	unsigned char *capture;
-	bool screen_refreshed = false, is_first_frame = true;
 
 	/* check args */
-	output = (argc < 2) ? efopen(default_output, "w"): efopen(argv[1], "w");
+	while ((opt = getopt(argc, argv, "hm:r:c:")) != -1) {
+		switch (opt) {
+		case 'h':
+			usage();
+			return EXIT_SUCCESS;
+		case 'm':
+			delay = dec2num(optarg);
+			break;
+		case 'r':
+			rows  = dec2num(optarg);
+			break;
+		case 'c':
+			cols  = dec2num(optarg);
+			break;
+		default:
+			break;
+		}
+	}
+	output = (optind < argc) ?
+		efopen(argv[optind], "w"): efopen(default_output, "w");
+
+	if (delay <= 0)
+		delay = MIN_DELAY;
+	if (rows == 0)
+		rows = TERM_ROWS;
+	if (cols == 0)
+		cols = TERM_COLS;
 
 	/* init */
-	setlocale(LC_ALL, "");
-	pb_init(&pb, TERM_WIDTH, TERM_HEIGHT);
+	setlocale(LC_ALL, ""); /* for wcwidth() */
+	pb_init(&pb, CELL_WIDTH * cols, CELL_HEIGHT * rows);
 	term_init(&term, pb.width, pb.height);
 	tty_init(&old_termio, &old_ws);
 
@@ -163,19 +200,19 @@ int main(int argc, char *argv[])
 	//ioctl(STDIN_FILENO, TIOCGWINSZ, &ws);
 	//fork_and_exec(&master, ws.ws_row, ws.ws_col);
 
-	/* set termio size 80x24 */
-	fork_and_exec(&master, TERM_ROWS, TERM_COLS);
+	/* set termio size */
+	fork_and_exec(&master, rows, cols);
 
-	/* set terminal size 80x24 (dtterm sequence) */
-	snprintf(escseq, BUFSIZE, "\033[8;%d;%dt", TERM_ROWS, TERM_COLS);
+	/* set terminal size (dtterm sequence) */
+	snprintf(escseq, BUFSIZE, "\033[8;%d;%dt", rows, cols);
 	ewrite(STDOUT_FILENO, escseq, strlen(escseq));
 
 	/* reset terminal */
 	ewrite(STDOUT_FILENO, "\033c", 2);
 
 	gif_init(&gif, pb.width, pb.height);
-	capture = (unsigned char *) ecalloc(pb.width * pb.height, 1);
-	get_timegap(&prev);
+	capture = (uint8_t *) ecalloc(pb.width * pb.height, 1);
+	get_timegap(&prev, delay);
 
 	/* main loop */
 	while (tty.loop_flag) {
@@ -193,14 +230,14 @@ int main(int argc, char *argv[])
 				ewrite(STDOUT_FILENO, buf, size);
 
 				if (size == BUFSIZE)
-					;/* maybe more data arrives soon */
+					continue; /* maybe more data arrives soon */
 				else
 					screen_refreshed = true;
 			}
 		}
 		/* add new frame to gif */
 		if (screen_refreshed) {
-			gap = get_timegap(&prev);
+			gap = get_timegap(&prev, delay);
 			if (is_first_frame) {
 				is_first_frame = false; /* not capture */
 			}
