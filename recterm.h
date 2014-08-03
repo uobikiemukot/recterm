@@ -18,8 +18,10 @@
 #include <sys/wait.h>
 #include <termios.h>
 #include <unistd.h>
-#include <wchar.h>
+//#include <wchar.h>
 
+#include "glyph.h"
+#include "glyph/multi_ambiguous_half.h"
 #include "glyph/multi_ambiguous_wide.h"
 #include "color.h"
 
@@ -185,3 +187,5 @@ struct tty_state tty = {
 	//.window_resized = false,
 	.child_killed   = false,
 };
+
+int (*wcwidth)(uint32_t ucs);

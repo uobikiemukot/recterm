@@ -335,7 +335,7 @@ void redraw(struct terminal *term)
 		term->line_dirty[i] = true;
 }
 
-void term_init(struct terminal *term, int width, int height)
+void term_init(struct terminal *term, int width, int height, const struct glyph_t glyphs[], uint32_t glyph_num)
 {
 	int i;
 	uint32_t code, gi;
@@ -361,7 +361,8 @@ void term_init(struct terminal *term, int width, int height)
 	for (code = 0; code < UCS2_CHARS; code++)
 		term->glyph_map[code] = NULL;
 
-	for (gi = 0; gi < sizeof(glyphs) / sizeof(struct glyph_t); gi++)
+	//for (gi = 0; gi < size; gi++)
+	for (gi = 0; gi < glyph_num; gi++)
 		term->glyph_map[glyphs[gi].code] = &glyphs[gi];
 
 	if (term->glyph_map[DEFAULT_CHAR] == NULL

@@ -10,6 +10,7 @@
 #include "parse.h"
 #include "gifsave89.h"
 #include "gif.h"
+#include "mk_wcwidth.h"
 
 enum {
 	TERM_WIDTH  = 640,
@@ -25,11 +26,12 @@ static const char *default_output = "recterm.gif";
 void usage()
 {
 	printf(
-		"usage: recterm [-m min_delay] [-r rows] [-c cols] [output]          \n"
-		"\tmin_delay: minimum delay (1/100 sec) of animation gif (default: 5)\n"
-		"\trows     : column size of internal termios (default: 80)          \n"
-		"\tcols     : row size of internal termios (default: 24)             \n"
-		"\toutput   : output filename (default: recterm.gif)                 \n"
+		"usage: recterm [-m min_delay] [-r rows] [-c cols] [-a width] [output]\n"
+		"\tmin_delay: minimum delay (1/100 sec) of animation gif (default: 5) \n"
+		"\trows     : column size of internal termios (default: 80)           \n"
+		"\tcols     : row size of internal termios (default: 24)              \n"
+		"\twidth    : wide or half for ambiguous width (default: wide)        \n"
+		"\toutput   : output filename (default: recterm.gif)                  \n"
 	);
 }
 
@@ -148,7 +150,7 @@ int main(int argc, char *argv[])
 	uint8_t buf[BUFSIZE], *capture;
 	uint16_t rows = TERM_ROWS, cols = TERM_COLS;
 	char escseq[BUFSIZE];
-	bool screen_refreshed = false, is_first_frame = true;
+	bool screen_refreshed = false, is_first_frame = true, ambiguous_is_wide = true;
 	ssize_t size;
 	int master = -1, delay = MIN_DELAY, gap, opt;
 	fd_set fds;
@@ -161,7 +163,7 @@ int main(int argc, char *argv[])
 	struct gif_t gif;
 
 	/* check args */
-	while ((opt = getopt(argc, argv, "hm:r:c:")) != -1) {
+	while ((opt = getopt(argc, argv, "hm:r:c:a:")) != -1) {
 		switch (opt) {
 		case 'h':
 			usage();
@@ -174,6 +176,10 @@ int main(int argc, char *argv[])
 			break;
 		case 'c':
 			cols  = dec2num(optarg);
+			break;
+		case 'a':
+			if (strstr(optarg, "half") != NULL)
+				ambiguous_is_wide = false;
 			break;
 		default:
 			break;
@@ -189,10 +195,17 @@ int main(int argc, char *argv[])
 	if (cols == 0)
 		cols = TERM_COLS;
 
+	wcwidth = (ambiguous_is_wide) ? mk_wcwidth_cjk: mk_wcwidth;
+
 	/* init */
-	setlocale(LC_ALL, ""); /* for wcwidth() */
+	//setlocale(LC_ALL, ""); /* for wcwidth() */
 	pb_init(&pb, CELL_WIDTH * cols, CELL_HEIGHT * rows);
-	term_init(&term, pb.width, pb.height);
+	if (ambiguous_is_wide)
+		term_init(&term, pb.width, pb.height,
+			ambiguous_wide_glyphs, sizeof(ambiguous_wide_glyphs) / sizeof(struct glyph_t));
+	else
+		term_init(&term, pb.width, pb.height,
+			ambiguous_half_glyphs, sizeof(ambiguous_half_glyphs) / sizeof(struct glyph_t));
 	tty_init(&old_termio, &old_ws);
 
 	/* fork and exec shell */
