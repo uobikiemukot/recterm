@@ -26,12 +26,13 @@ static const char *default_output = "recterm.gif";
 void usage()
 {
 	printf(
-		"usage: recterm [-m min_delay] [-r rows] [-c cols] [-a width] [output]\n"
-		"\tmin_delay: minimum delay (1/100 sec) of animation gif (default: 5) \n"
-		"\trows     : column size of internal termios (default: 80)           \n"
-		"\tcols     : row size of internal termios (default: 24)              \n"
-		"\twidth    : wide or half for ambiguous width (default: wide)        \n"
-		"\toutput   : output filename (default: recterm.gif)                  \n"
+		"usage: recterm [-h] [-m min_delay] [-r rows] [-c cols] [-a width] [output]\n"
+		"\t-h          : show this help                                          \n"
+		"\t-m min_delay: minimum delay (1/100 sec) of animation gif (default: 5) \n"
+		"\t-r rows     : column size of internal termios (default: 80)           \n"
+		"\t-c cols     : row size of internal termios (default: 24)              \n"
+		"\t-a width    : wide or half for ambiguous width (default: wide)        \n"
+		"\toutput      : output filename (default: recterm.gif)                  \n"
 	);
 }
 
