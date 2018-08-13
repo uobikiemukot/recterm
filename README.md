@@ -25,6 +25,33 @@
 
 This program is based on [yaft](https://github.com/uobikiemukot/yaft).
 
+## configuration
+
+edit `conf.h`
+
+```
+$ vi conf.h
+```
+
+for details, please refer README of yaft
+
+- https://github.com/uobikiemukot/yaft
+
+## install
+
+before using recterm, you should install terminfo of yaft.
+
+```
+$ wget https://raw.githubusercontent.com/uobikiemukot/yaft/develop/info/yaft.src
+$ tic yaft.src
+```
+
+then type `make`.
+
+```
+$ make
+```
+
 ## usage
 
 ```
